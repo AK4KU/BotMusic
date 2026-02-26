@@ -1,10 +1,56 @@
 const playdl = require('play-dl');
+const { getTracks } = require('spotify-url-info');
+
+/**
+ * Cek apakah input adalah URL Spotify.
+ */
+function isSpotifyUrl(input) {
+  return /open\.spotify\.com\/(track|playlist|album)\//.test(input);
+}
+
+/**
+ * Cari YouTube berdasarkan judul + artist, kembalikan track object.
+ */
+async function searchYouTube(title, artist, duration, thumbnail, requestedBy) {
+  const query = artist ? `${title} ${artist}` : title;
+  const results = await playdl.search(query, { source: { youtube: 'video' }, limit: 1 });
+  if (!results.length) return null;
+  const v = results[0];
+  return {
+    url: v.url,
+    title,
+    duration: duration || v.durationRaw,
+    thumbnail: thumbnail || v.thumbnails?.[0]?.url,
+    artist,
+    requestedBy,
+  };
+}
 
 /**
  * Resolve input (URL atau query) menjadi array track object.
  * Support: YouTube video, YouTube playlist, Spotify track, Spotify playlist, Spotify album.
  */
 async function resolveTracks(input, requestedBy) {
+  // ── Spotify (tanpa API key) ──────────────────────────────────────────────
+  if (isSpotifyUrl(input)) {
+    const spTracks = await getTracks(input);
+    if (!spTracks || spTracks.length === 0) throw new Error('Gagal mengambil info dari Spotify.');
+
+    const resolved = [];
+    for (const t of spTracks) {
+      const title = t.name || t.title;
+      const artist = Array.isArray(t.artists)
+        ? t.artists.map(a => (typeof a === 'string' ? a : a.name)).join(', ')
+        : (t.artist || '');
+      const thumbnail = t.image || t.album?.images?.[0]?.url;
+      const duration = t.duration_ms ? msToTime(t.duration_ms) : null;
+      const track = await searchYouTube(title, artist, duration, thumbnail, requestedBy);
+      if (track) resolved.push(track);
+    }
+    if (!resolved.length) throw new Error('Tidak ada lagu Spotify yang berhasil diproses.');
+    return resolved;
+  }
+
   const type = await playdl.validate(input);
 
   // ── YouTube: Single video ────────────────────────────────────────────────
@@ -30,33 +76,6 @@ async function resolveTracks(input, requestedBy) {
       duration: v.durationRaw,
       thumbnail: v.thumbnails?.[0]?.url,
       artist: v.channel?.name,
-      requestedBy,
-    }));
-  }
-
-  // ── Spotify: Single track ────────────────────────────────────────────────
-  if (type === 'sp_track') {
-    const sp = await playdl.spotify(input);
-    return [{
-      url: input,
-      title: sp.name,
-      duration: msToTime(sp.durationInMs),
-      thumbnail: sp.thumbnail?.url,
-      artist: sp.artists?.map(a => a.name).join(', '),
-      requestedBy,
-    }];
-  }
-
-  // ── Spotify: Playlist atau Album ─────────────────────────────────────────
-  if (type === 'sp_playlist' || type === 'sp_album') {
-    const sp = await playdl.spotify(input);
-    const tracks = await sp.all_tracks();
-    return tracks.map(t => ({
-      url: t.url,
-      title: t.name,
-      duration: msToTime(t.durationInMs),
-      thumbnail: t.thumbnail?.url,
-      artist: t.artists?.map(a => a.name).join(', '),
       requestedBy,
     }));
   }
