@@ -27,16 +27,48 @@ client.commands = new Collection();   // Slash commands
 client.prefixCommands = new Collection(); // Prefix commands
 client.queues = new Map();            // Music queues per guild
 
-// Setup Spotify credentials (jika ada)
+/**
+ * Parse Netscape cookies.txt format menjadi cookie string untuk play-dl.
+ */
+function parseNetscapeCookies(content) {
+  return content
+    .split('\n')
+    .filter(line => line && !line.startsWith('#'))
+    .map(line => {
+      const parts = line.split('\t');
+      if (parts.length >= 7) return `${parts[5]}=${parts[6]}`;
+      return null;
+    })
+    .filter(Boolean)
+    .join('; ');
+}
+
+// Setup YouTube cookies & Spotify credentials
 (async () => {
-  // Cek cookies.txt untuk yt-dlp (info saja, yt-dlp loads it langsung via --cookies flag)
-  const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
-  if (fs.existsSync(cookiesPath)) {
-    console.log('[YouTube] cookies.txt ditemukan — akan digunakan oleh yt-dlp untuk stream.');
+  // ── YouTube Cookies ──────────────────────────────────────────────────────
+  let youtubeCookie = '';
+
+  // Prioritas 1: env var YOUTUBE_COOKIE (untuk Railway)
+  if (process.env.YOUTUBE_COOKIE) {
+    youtubeCookie = process.env.YOUTUBE_COOKIE;
+    console.log('[YouTube] Cookie dimuat dari environment variable.');
   } else {
-    console.warn('[YouTube] cookies.txt tidak ditemukan. Stream YouTube mungkin lebih lambat/gagal.');
+    // Prioritas 2: file cookies.txt lokal
+    const cookiesPath = path.join(__dirname, '..', 'cookies.txt');
+    if (fs.existsSync(cookiesPath)) {
+      const raw = fs.readFileSync(cookiesPath, 'utf-8');
+      youtubeCookie = parseNetscapeCookies(raw);
+      console.log('[YouTube] Cookie dimuat dari cookies.txt.');
+    } else {
+      console.warn('[YouTube] Tidak ada cookie — YouTube mungkin memblokir request.');
+    }
   }
 
+  if (youtubeCookie) {
+    await playdl.setToken({ youtube: { cookie: youtubeCookie } });
+  }
+
+  // ── Spotify credentials (opsional) ──────────────────────────────────────
   if (
     process.env.SPOTIFY_CLIENT_ID &&
     process.env.SPOTIFY_CLIENT_SECRET &&
