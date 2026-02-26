@@ -1,0 +1,20 @@
+const { readdirSync } = require('fs');
+const path = require('path');
+
+function loadEvents(client) {
+  const eventsPath = path.join(__dirname, '..', 'events');
+  const files = readdirSync(eventsPath).filter(f => f.endsWith('.js'));
+
+  for (const file of files) {
+    const event = require(path.join(eventsPath, file));
+    if (event.once) {
+      client.once(event.name, (...args) => event.execute(...args, client));
+    } else {
+      client.on(event.name, (...args) => event.execute(...args, client));
+    }
+  }
+
+  console.log(`[Events] ${files.length} event(s) dimuat.`);
+}
+
+module.exports = { loadEvents };
