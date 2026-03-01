@@ -235,7 +235,8 @@ class MusicQueue {
     return new Promise((resolve, reject) => {
       const args = [
         url,
-        '-f', 'bestaudio/best',
+        '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
+        '--no-check-formats',
         '-o', '-',
         '--no-playlist',
         '--no-warnings',
