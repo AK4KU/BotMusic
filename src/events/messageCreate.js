@@ -4,7 +4,7 @@ module.exports = {
   async execute(message, client) {
     if (message.author.bot) return;
 
-    const prefix = process.env.BOT_PREFIX || '!';
+    const prefix = process.env.BOT_PREFIX || 'a!';
     if (!message.content.startsWith(prefix)) return;
 
     const args = message.content.slice(prefix.length).trim().split(/\s+/);

@@ -195,6 +195,8 @@ class MusicQueue {
         '--no-warnings',
         '--quiet',
         '-N', '4',
+        // Gunakan iOS client agar lolos bot-check YouTube
+        '--extractor-args', 'youtube:player_client=ios,web',
       ];
 
       if (COOKIES_VALID) {
