@@ -240,8 +240,8 @@ class MusicQueue {
         '--no-playlist',
         '--no-warnings',
         '-N', '4',
-        // mweb: mobile web client, tidak kena bot-check, format lengkap
-        '--extractor-args', 'youtube:player_client=mweb,web',
+        // android: format lengkap, bebas bot-check, tidak butuh cookies khusus
+        '--extractor-args', 'youtube:player_client=android',
       ];
 
       if (COOKIES_VALID) {
