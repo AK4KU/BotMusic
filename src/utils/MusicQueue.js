@@ -235,14 +235,13 @@ class MusicQueue {
     return new Promise((resolve, reject) => {
       const args = [
         url,
-        '-f', 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
-        '--no-check-formats',
+        '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
         '-o', '-',
         '--no-playlist',
         '--no-warnings',
         '-N', '4',
-        // Gunakan iOS client agar lolos bot-check YouTube
-        '--extractor-args', 'youtube:player_client=ios,web',
+        // tv_embedded: tidak kena bot-check, format lengkap (tidak seperti ios yang HLS-only)
+        '--extractor-args', 'youtube:player_client=tv_embedded,web',
       ];
 
       if (COOKIES_VALID) {
