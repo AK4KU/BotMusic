@@ -240,8 +240,8 @@ class MusicQueue {
         '--no-playlist',
         '--no-warnings',
         '-N', '4',
-        // tv_embedded: tidak kena bot-check, format lengkap (tidak seperti ios yang HLS-only)
-        '--extractor-args', 'youtube:player_client=tv_embedded,web',
+        // mweb: mobile web client, tidak kena bot-check, format lengkap
+        '--extractor-args', 'youtube:player_client=mweb,web',
       ];
 
       if (COOKIES_VALID) {
