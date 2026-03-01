@@ -24,21 +24,57 @@ const YTDLP_BINARY = (() => {
   return process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 })();
 
-// Path cookies.txt (opsional)
-const COOKIES_PATH = path.join(__dirname, '..', '..', 'cookies.txt');
+// Konversi browser cookie string (format: "name=val; name2=val2")
+// ke format Netscape yang dipakai yt-dlp
+function browserCookiesToNetscape(cookieStr) {
+  const lines = [
+    '# Netscape HTTP Cookie File',
+    '# Generated from YOUTUBE_COOKIE env var',
+    '',
+  ];
+  for (const pair of cookieStr.split(';').map(s => s.trim()).filter(Boolean)) {
+    const eq = pair.indexOf('=');
+    if (eq === -1) continue;
+    const name = pair.slice(0, eq).trim();
+    const value = pair.slice(eq + 1).trim();
+    // domain  includeSubdomains  path  secure  expiry  name  value
+    lines.push(`.youtube.com\tTRUE\t/\tTRUE\t0\t${name}\t${value}`);
+  }
+  return lines.join('\n') + '\n';
+}
 
-// Cek sekali apakah cookies.txt valid format Netscape
-function isValidNetscapeCookies() {
+// Tentukan path cookies yang akan digunakan
+const COOKIES_PATH = (() => {
+  // 1. Prioritas: env var YOUTUBE_COOKIE (untuk Railway/server tanpa file system persisten)
+  const envCookie = process.env.YOUTUBE_COOKIE;
+  if (envCookie && envCookie.trim()) {
+    const tmpPath = path.join(require('os').tmpdir(), 'yt_cookies.txt');
+    try {
+      fs.writeFileSync(tmpPath, browserCookiesToNetscape(envCookie), 'utf-8');
+      console.log('[YouTube] Cookies dimuat dari env var YOUTUBE_COOKIE →', tmpPath);
+      return tmpPath;
+    } catch (e) {
+      console.warn('[YouTube] Gagal tulis cookies dari env var:', e.message);
+    }
+  }
+  // 2. Fallback: cookies.txt lokal
+  return path.join(__dirname, '..', '..', 'cookies.txt');
+})();
+
+// Validasi cookies yang akan dipakai
+const COOKIES_VALID = (() => {
   try {
     if (!fs.existsSync(COOKIES_PATH)) return false;
     const firstLine = fs.readFileSync(COOKIES_PATH, 'utf-8').split('\n')[0] || '';
     return firstLine.startsWith('# Netscape HTTP Cookie File') || firstLine.startsWith('# HTTP Cookie File');
   } catch { return false; }
-}
-const COOKIES_VALID = isValidNetscapeCookies();
-if (!COOKIES_VALID && fs.existsSync(COOKIES_PATH)) {
-  console.warn('[YouTube] cookies.txt ditemukan tapi bukan format Netscape — diabaikan.');
-  console.warn('[YouTube] Export ulang cookies dari browser menggunakan ekstensi "Get cookies.txt LOCALLY".');
+})();
+if (!COOKIES_VALID) {
+  if (fs.existsSync(COOKIES_PATH)) {
+    console.warn('[YouTube] cookies.txt ditemukan tapi bukan format Netscape — diabaikan.');
+  } else {
+    console.warn('[YouTube] Tidak ada cookies — bot mungkin kena bot-check YouTube.');
+  }
 }
 
 class MusicQueue {
