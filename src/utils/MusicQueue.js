@@ -13,16 +13,26 @@ const { PassThrough } = require('stream');
 const path = require('path');
 const fs = require('fs');
 
-// Path ke binary yt-dlp — cross-platform (Windows: yt-dlp.exe, Linux: yt-dlp)
+// Path ke binary yt-dlp — prefer system yt-dlp (Railway/nixpacks), fallback ke npm
 const YTDLP_BINARY = (() => {
+  // Di Linux (Railway): pakai yt-dlp dari sistem (nixpacks)
+  if (process.platform !== 'win32') {
+    const { execSync } = require('child_process');
+    try {
+      execSync('which yt-dlp', { stdio: 'ignore' });
+      console.log('[yt-dlp] Menggunakan binary sistem: yt-dlp');
+      return 'yt-dlp';
+    } catch {}
+  }
+  // Windows atau fallback: cari di node_modules
   const base = path.join(__dirname, '..', '..', 'node_modules', 'yt-dlp-exec', 'bin');
   const win = path.join(base, 'yt-dlp.exe');
   const unix = path.join(base, 'yt-dlp');
   if (fs.existsSync(win)) return win;
   if (fs.existsSync(unix)) return unix;
-  // Fallback: pakai yt-dlp dari PATH sistem
   return process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
 })();
+console.log('[yt-dlp] Binary path:', YTDLP_BINARY);
 
 // Konversi browser cookie string (format: "name=val; name2=val2")
 // ke format Netscape yang dipakai yt-dlp
@@ -229,7 +239,6 @@ class MusicQueue {
         '-o', '-',
         '--no-playlist',
         '--no-warnings',
-        '--quiet',
         '-N', '4',
         // Gunakan iOS client agar lolos bot-check YouTube
         '--extractor-args', 'youtube:player_client=ios,web',
@@ -258,9 +267,13 @@ class MusicQueue {
       proc.stdout.on('error', doReject);
       passThrough.on('error', () => {}); // abaikan error passThrough setelah resolve
 
+      const stderrLines = [];
       proc.stderr.on('data', (data) => {
         const msg = data.toString().trim();
-        if (msg) console.error(`[yt-dlp] ${msg}`);
+        if (msg) {
+          stderrLines.push(msg);
+          console.error(`[yt-dlp] ${msg}`);
+        }
       });
 
       // Tunggu chunk pertama sebagai konfirmasi stream berjalan
@@ -284,7 +297,8 @@ class MusicQueue {
       proc.once('close', (code) => {
         clearTimeout(timeout);
         if (!gotFirstChunk) {
-          doReject(new Error(`yt-dlp keluar dengan kode ${code ?? 1} sebelum data diterima`));
+          const detail = stderrLines.slice(-3).join(' | ');
+          doReject(new Error(`yt-dlp exit code ${code ?? 1}: ${detail || 'tidak ada output'}`) );
         }
       });
 
